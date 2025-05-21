@@ -7,13 +7,13 @@ This portfolio project showcases a complete end-to-end data warehousing and anal
 
 This project implements the **Medallion Architecture** pattern, consisting of **Bronze**, **Silver**, and **Gold** layers:
 
-1 **Bronze Layer**:
+1. **Bronze Layer**:
   Raw data ingested as-is from source systems (CSV files) into SQL Server tables.
 
-2 **Silver Layer**:
+2. **Silver Layer**:
   Data cleansing, transformation, and normalization are performed to prepare the data for analysis.
 
-3 **Gold Layer**:
+3. **Gold Layer**:
   Business-ready data is structured into a **star schema**, enabling efficient reporting and analytics.
   
 ---
