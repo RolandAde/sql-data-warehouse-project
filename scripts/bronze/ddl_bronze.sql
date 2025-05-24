@@ -1,167 +1,96 @@
 /*
-=============================================================================================
-Script Name:     bronze.load_bronze
-Script Type:     Stored Procedure
-Layer:           Bronze (Raw Data Ingestion)
----------------------------------------------------------------------------------------------
-Purpose:
-    This stored procedure automates the ingestion of raw data into the Bronze layer of the 
-    Data Warehouse using SQL Server's BULK INSERT.
+===========================================================================================
+Script Purpose:
+    This script defines the structure of raw data tables within the 'bronze' schema (layer)
+    of a Data Warehouse built for CRM and ERP integration.
 
 Overview:
-    The Bronze layer is the initial landing zone for raw, untransformed data from various 
-    source systems including CRM and ERP platforms. This script performs the following tasks:
+    The bronze layer acts as the staging area where raw, untransformed data from 
+    various source systems is initially loaded. These tables represent different 
+    entities such as customer information, product details, sales transactions, 
+    customer demographics, location mappings, and product categories.
 
-        • Truncates each staging table in the 'bronze' schema to clear old data.
-        • Loads fresh data from structured CSV files using efficient BULK INSERT operations.
-        • Logs the duration of each data load step for monitoring purposes.
-        • Captures and prints error messages in case of failure.
+Tables Created:
+    - bronze.crm_cust_info       : Stores basic CRM customer data
+    - bronze.crm_prd_info        : Contains product-related metadata from CRM
+    - bronze.crm_sales_details   : Sales order details at the line-item level
+    - bronze.erp_cust_az12       : ERP customer birthdates and gender
+    - bronze.erp_loc_a101        : Country-level location information for customers
+    - bronze.erp_px_cat_g1v2     : Product category and subcategory metadata
 
-Source Systems & Files:
-    - CRM:
-        ▪ cust_info.csv       → Customer master data
-        ▪ prd_info.csv        → Product catalog
-        ▪ sales_details.csv   → Sales transactions
-
-    - ERP:
-        ▪ CUST_AZ12.csv       → Customer demographics
-        ▪ LOC_A101.csv        → Customer location info
-        ▪ PX_CAT_G1V2.csv     → Product category metadata
-		
-Key Notes:
-    - BULK INSERT improves performance for large file ingestion.
-    - TRUNCATE TABLE ensures clean reloads and is faster than DELETE.
-    - `TABLOCK` hints optimize bulk loading speed.
-    - File paths must be accessible to the SQL Server instance (consider UNC paths if remote).
-    - Suitable for development or batch refresh processes; should be adapted for production.
-=============================================================================================
+Note:
+    Existing tables are dropped before creation to ensure a clean refresh during development. 
+    This should be handled carefully or excluded in production environments.
+===========================================================================================
 */
 
 
-CREATE OR ALTER PROCEDURE bronze.load_bronze AS
-BEGIN
-	DECLARE @start_time DATETIME, @end_time DATETIME, @batch_start_time DATETIME, @batch_end_time DATETIME;
-	BEGIN TRY
-		PRINT '===================================================';
-		PRINT 'Loading Bronze Layer';
-		PRINT '===================================================';
+IF OBJECT_ID ('bronze.crm_cust_info', 'U') IS NOT NULL                                                                                                                            
+	DROP TABLE bronze.crm_cust_info;
 
-		PRINT '---------------------------------------------------';
-		PRINT 'Loading CRM Tables';
-		PRINT '---------------------------------------------------';
+CREATE TABLE bronze.crm_cust_info (
+	cst_id INT,
+	cst_key NVARCHAR(50),
+	cst_firstname NVARCHAR(50),
+	cst_lastname NVARCHAR(50),
+	cst_marital_status NVARCHAR(50),                                                                                       
+	cst_gndr NVARCHAR(50),
+	cst_create_date DATE
+);
 
-		SET @start_time = GETDATE();
-		PRINT '>> Truncating Table: bronze.crm_cust_info';
-		TRUNCATE TABLE bronze.crm_cust_info;
+IF OBJECT_ID ('bronze.crm_prd_info', 'U') IS NOT NULL
+	DROP TABLE bronze.crm_prd_info;
 
-		PRINT '>> Inserting Data Into: bronze.crm_cust_info';
-		BULK INSERT bronze.crm_cust_info
-		FROM 'C:\Users\HP\Desktop\My Data Science Journey\SQL\Microsoft SQL Server\Queries\Portfolio Project\datasets\source_crm\cust_info.csv'
-		WITH (
-			FIRSTROW = 2, --Table has headers
-			FIELDTERMINATOR = ',', --Delimiter
-			TABLOCK
-		);
-		SET @end_time = GETDATE();
-		PRINT '>> Load Duration: ' + CAST(DATEDIFF(second, @start_time, @end_time) AS NVARCHAR) + 'second';
-		PRINT '>> -------------';
+CREATE TABLE bronze.crm_prd_info (
+	prd_id	INT,
+	prd_key	NVARCHAR(50),
+	prd_nm	NVARCHAR(50),
+	prd_cost INT,	
+	prd_line NVARCHAR(50),
+	prd_start_dt DATETIME,             
+);     
+                                                                                                           
+IF OBJECT_ID ('bronze.crm_sales_details', 'U') IS NOT NULL
+	DROP TABLE bronze.crm_sales_details;
 
-		SET @start_time = GETDATE();
-		PRINT '>> Truncating Table: bronze.crm_prd_info';
-		TRUNCATE TABLE bronze.crm_prd_info;
+CREATE TABLE bronze.crm_sales_details (
+	sls_ord_num NVARCHAR(50),
+	sls_prd_key NVARCHAR(50),
+	sls_cust_id INT,
+	sls_order_dt INT,
+	sls_ship_dt INT,
+	sls_due_dt INT,
+	sls_sales INT,
+	sls_quantity INT,
+	sls_price INT
+);
 
-		PRINT '>> Inserting Data Into: bronze.crm_prd_info';
-		BULK INSERT bronze.crm_prd_info
-		FROM 'C:\Users\HP\Desktop\My Data Science Journey\SQL\Microsoft SQL Server\Queries\Portfolio Project\datasets\source_crm\prd_info.csv'
-		WITH (
-			FIRSTROW = 2, --Table has headers
-			FIELDTERMINATOR = ',', --Delimiter
-			TABLOCK
-		);
-		SET @end_time = GETDATE();
-		PRINT '>> Load Duration: ' + CAST(DATEDIFF(second, @start_time, @end_time) AS NVARCHAR) + 'second';
-		PRINT '>> -------------';
+IF OBJECT_ID ('bronze.erp_cust_az12', 'U') IS NOT NULL
+	DROP TABLE bronze.erp_cust_az12;
 
-		SET @start_time = GETDATE();
-		PRINT '>> Truncating Table: bronze.crm_sales_details';
-		TRUNCATE TABLE bronze.crm_sales_details;
+CREATE TABLE bronze.erp_cust_az12 (
+	cid NVARCHAR(50),
+	bdate DATE,
+	gen NVARCHAR(50)
+);
 
-		PRINT '>> Inserting Data Into: bronze.crm_sales_details';
-		BULK INSERT bronze.crm_sales_details
-		FROM 'C:\Users\HP\Desktop\My Data Science Journey\SQL\Microsoft SQL Server\Queries\Portfolio Project\datasets\source_crm\sales_details.csv'
-		WITH (
-			FIRSTROW = 2, --Table has headers
-			FIELDTERMINATOR = ',', --Delimiter
-			TABLOCK
-		);
-		SET @end_time = GETDATE();
-		PRINT '>> Load Duration: ' + CAST(DATEDIFF(second, @start_time, @end_time) AS NVARCHAR) + 'second';
-		PRINT '>> -------------';
+IF OBJECT_ID ('bronze.erp_loc_a101', 'U') IS NOT NULL
+	DROP TABLE bronze.erp_loc_a101;
 
-		PRINT '---------------------------------------------------';
-		PRINT 'Loading ERP Tables';
-		PRINT '---------------------------------------------------';
+CREATE TABLE bronze.erp_loc_a101 (
+	cid NVARCHAR(50),
+	cntry NVARCHAR(50)
+);
 
-		SET @start_time = GETDATE();
-		PRINT '>> Truncating Table: bronze.erp_CUST_AZ12';
-		TRUNCATE TABLE bronze.erp_CUST_AZ12;
+IF OBJECT_ID ('bronze.erp_px_cat_g1v2', 'U') IS NOT NULL
+	DROP TABLE bronze.erp_px_cat_g1v2;
 
-		PRINT '>> Inserting Data Into: bronze.erp_CUST_AZ12';
-		BULK INSERT bronze.erp_CUST_AZ12
-		FROM 'C:\Users\HP\Desktop\My Data Science Journey\SQL\Microsoft SQL Server\Queries\Portfolio Project\datasets\source_erp\CUST_AZ12.csv'
-		WITH (
-			FIRSTROW = 2, --Table has headers
-			FIELDTERMINATOR = ',', --Delimiter
-			TABLOCK
-		);
-		SET @end_time = GETDATE();
-		PRINT '>> Load Duration: ' + CAST(DATEDIFF(second, @start_time, @end_time) AS NVARCHAR) + 'second';
-		PRINT '>> -------------';
+CREATE TABLE bronze.erp_px_cat_g1v2 (
+	id NVARCHAR(50),
+	cat NVARCHAR(50),
+	subcat NVARCHAR(50),
+	maintenance NVARCHAR(50)
+);
 
-		SET @start_time = GETDATE();
-		PRINT '>> Truncating Table: bronze.erp_LOC_A101';
-		TRUNCATE TABLE bronze.erp_LOC_A101;
 
-		PRINT '>> Inserting Data Into: bronze.erp_LOC_A101';
-		BULK INSERT bronze.erp_LOC_A101
-		FROM 'C:\Users\HP\Desktop\My Data Science Journey\SQL\Microsoft SQL Server\Queries\Portfolio Project\datasets\source_erp\LOC_A101.csv'
-		WITH (
-			FIRSTROW = 2, --Table has headers
-			FIELDTERMINATOR = ',', --Delimiter
-			TABLOCK
-		);
-		SET @end_time = GETDATE();
-		PRINT '>> Load Duration: ' + CAST(DATEDIFF(second, @start_time, @end_time) AS NVARCHAR) + 'second';
-		PRINT '>> -------------';
-
-		SET @start_time = GETDATE();
-		PRINT '>> Truncating Table: bronze.erp_PX_CAT_G1V2';
-		TRUNCATE TABLE bronze.erp_PX_CAT_G1V2;
-
-		PRINT '>> Inserting Data Into: bronze.erp_PX_CAT_G1V2';
-		BULK INSERT bronze.erp_PX_CAT_G1V2
-		FROM 'C:\Users\HP\Desktop\My Data Science Journey\SQL\Microsoft SQL Server\Queries\Portfolio Project\datasets\source_erp\PX_CAT_G1V2.csv'
-		WITH (
-			FIRSTROW = 2, --Table has headers
-			FIELDTERMINATOR = ',', --Delimiter
-			TABLOCK
-		);
-		SET @end_time = GETDATE();
-		PRINT '>> Load Duration: ' + CAST(DATEDIFF(second, @start_time, @end_time) AS NVARCHAR) + 'seconds';
-		PRINT '>> -------------';
-
-		SET @batch_end_time = GETDATE();
-		PRINT '========================================================';
-		PRINT 'Loading Bronze Layer is Completed';
-		PRINT '   - Total Load Duration: ' + CAST(DATEDIFF(SECOND, @batch_start_time, @batch_end_time) AS NVARCHAR) + 'seconds';
-		PRINT '========================================================';
-	END TRY
-	BEGIN CATCH
-		PRINT '========================================================';
-		PRINT '	ERROR OCCURED DURING LOADING BRONZE LAYER';
-		PRINT '	ERROR MESSAGE' + ERROR_MESSAGE();
-		PRINT '	ERROR MESSAGE' + CAST (ERROR_NUMBER() AS NVARCHAR);
-		PRINT '	ERROR MESSAGE' + CAST (ERROR_STATE() AS NVARCHAR);
-		PRINT '========================================================';
-	END CATCH
-END
+                                                         
